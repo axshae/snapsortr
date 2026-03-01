@@ -25,6 +25,7 @@ import { scanDirectory } from '../services/fileSystem';
 import * as db from '../services/database';
 import { buildTreeFromImages, pathToId } from '../utils/imageUtils';
 import { clearThumbnailCache } from '../utils/thumbnailCache';
+import { clearDecodedBlobCache } from '../utils/decodeImage';
 
 interface AppState {
   // ── Wizard ─────────────────────────────────────────────────────────────────
@@ -303,6 +304,7 @@ export const useAppStore = create<AppState>()(
       // permanently delete a session they should use "Delete from history".
       db.clearRootHandle();
       clearThumbnailCache();
+      clearDecodedBlobCache();
     },
 
     // ── History actions ───────────────────────────────────────────────────────

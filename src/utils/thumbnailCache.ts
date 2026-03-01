@@ -63,6 +63,8 @@ function releaseSlot(): void {
 
 // ─── Core generator ───────────────────────────────────────────────────────────
 
+import { getDisplayableBlob } from './decodeImage';
+
 async function generate(
   id: string,
   handle: FileSystemFileHandle,
@@ -71,13 +73,17 @@ async function generate(
 
   try {
     const file = await handle.getFile();
+    // Pre-process formats that need decoding (HEIC, HEIF, TIFF, SVG).
+    // Pass `id` so the decoded blob is cached — the full-screen viewer can
+    // reuse it without running heic2any/utif a second time.
+    const displayable = await getDisplayableBlob(file, id);
 
     let url: string;
 
     try {
       // Decode the image. In Chrome, createImageBitmap runs through the GPU
       // process; for JPEG it uses a sub-sampled DCT path for large images.
-      const bitmap = await createImageBitmap(file);
+      const bitmap = await createImageBitmap(displayable);
 
       // Scale to thumbnail dimensions
       const { width: bw, height: bh } = bitmap;
@@ -101,10 +107,9 @@ async function generate(
 
       url = URL.createObjectURL(blob);
     } catch {
-      // createImageBitmap can't decode HEIC, TIFF on some platforms, corrupted
-      // files, etc. Fall back to a full-res URL — same as the previous behaviour.
-      const file2 = await handle.getFile();
-      url = URL.createObjectURL(file2);
+      // createImageBitmap failed (e.g. corrupted file). Fall back to a
+      // full-res URL of the already-decoded displayable blob.
+      url = URL.createObjectURL(displayable);
     }
 
     cache.set(id, url);

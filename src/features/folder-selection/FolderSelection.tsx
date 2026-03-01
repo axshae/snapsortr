@@ -7,46 +7,76 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import {
-  FolderOpen, Keyboard, Database, Package,
-  Loader2, History, Trash2, Download, PlayCircle, Check, X, Upload,
+  FolderOpen, Keyboard, Database, Package, ShieldCheck,
+  Loader2, Download, Upload,
 } from 'lucide-react';
 import logo from '../../assets/logo.png';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { pickDirectory, requestHandlePermission } from '../../services/fileSystem';
-import { getAllSelectionsForSession } from '../../services/database';
 import { useResumeSession } from '../../hooks/useResumeSession';
-import { SessionRecord } from '../../types';
 import { cn } from '../../utils/cn';
 
 export function FolderSelection() {
   const {
     loadFolder, setStep, isScanning, scanCount,
-    sessions, loadSessions, resumeSession, deleteSessionFromHistory, exportSessionProgress,
+    loadSessions, exportSessionProgress,
     importSessionFromJson,
-    images, selections,
+    images,
   } = useAppStore(useShallow((s) => ({
     loadFolder: s.loadFolder,
     setStep: s.setStep,
     isScanning: s.isScanning,
     scanCount: s.scanCount,
-    sessions: s.sessions,
     loadSessions: s.loadSessions,
-    resumeSession: s.resumeSession,
-    deleteSessionFromHistory: s.deleteSessionFromHistory,
     exportSessionProgress: s.exportSessionProgress,
     importSessionFromJson: s.importSessionFromJson,
     images: s.images,
-    selections: s.selections,
   })));
 
   const { resumeHandle, isChecking, permissionGranted, clearResume } = useResumeSession();
   const [error, setError] = useState<string | null>(null);
-  const [resumingId, setResumingId] = useState<string | null>(null);
-  const [historyOpen, setHistoryOpen] = useState(true);
   const [importStatus, setImportStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const importJsonRef = useRef<HTMLInputElement>(null);
   const autoResumed = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = useRef(0);
+
+  function handleDragEnter(e: React.DragEvent) {
+    e.preventDefault();
+    dragCounter.current++;
+    setIsDragging(true);
+  }
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    dragCounter.current--;
+    if (dragCounter.current === 0) setIsDragging(false);
+  }
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+  }
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    dragCounter.current = 0;
+    setIsDragging(false);
+    setError(null);
+    const items = Array.from(e.dataTransfer.items);
+    for (const item of items) {
+      if (item.kind === 'file') {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const handle = await (item as any).getAsFileSystemHandle();
+          if (handle && handle.kind === 'directory') {
+            await startScan(handle as FileSystemDirectoryHandle);
+            return;
+          }
+        } catch {
+          // handle not available in this browser
+        }
+      }
+    }
+    setError('Please drop a folder, not individual files.');
+  }
 
   // Load session history on mount
   useEffect(() => {
@@ -95,73 +125,9 @@ export function FolderSelection() {
     }
   }
 
-  async function handleResumeSession(session: SessionRecord) {
-    setError(null);
-    setResumingId(session.id);
-    try {
-      await resumeSession(session.id);
-      setStep('image-review');
-    } catch {
-      // Handle not available — fall back to directory picker
-      setResumingId(null);
-      setError(`Could not restore "${session.folderName}" automatically. Please re-open the folder.`);
-      try {
-        const handle = await pickDirectory();
-        await startScan(handle);
-      } catch (err2) {
-        if (err2 instanceof Error && err2.name !== 'AbortError') {
-          setError(err2.message);
-        }
-      }
-    }
-  }
-
-  async function handleDeleteSession(e: React.MouseEvent, id: string) {
-    e.stopPropagation();
-    await deleteSessionFromHistory(id);
-  }
-
   function handleExportSession(e: React.MouseEvent) {
     e.stopPropagation();
-    // Only works when images are loaded in memory
     exportSessionProgress();
-  }
-
-  async function handleExportSessionCard(e: React.MouseEvent, session: SessionRecord) {
-    e.stopPropagation();
-    // Load per-image selections for this session from IndexedDB so the
-    // exported file is fully importable (contains an `images` array).
-    const selections = await getAllSelectionsForSession(session.id);
-    const images = selections.map((s) => {
-      const lastSlash = s.path.lastIndexOf('/');
-      return {
-        path: s.path,
-        filename: lastSlash === -1 ? s.path : s.path.slice(lastSlash + 1),
-        directory: lastSlash === -1 ? '' : s.path.slice(0, lastSlash),
-        status: s.selection,
-      };
-    });
-    const output = {
-      session: session.folderName,
-      exportedAt: new Date().toISOString(),
-      stats: {
-        total: session.totalImages,
-        taken: session.taken,
-        dropped: session.dropped,
-        undecided: session.totalImages - session.taken - session.dropped,
-        progressPct: session.totalImages > 0
-          ? Math.round(((session.taken + session.dropped) / session.totalImages) * 100)
-          : 0,
-      },
-      images,
-    };
-    const blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${session.folderName}-progress.json`;
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   async function handleImportJson(e: React.ChangeEvent<HTMLInputElement>) {
@@ -215,44 +181,35 @@ export function FolderSelection() {
     );
   }
 
-  // Show per-session resume spinner
-  if (resumingId) {
-    return (
-      <div className="flex flex-col items-center justify-center flex-1 gap-4">
-        <Loader2 size={32} className="animate-spin text-curator-accent" />
-        <p className="text-sm font-medium text-curator-text">
-          Resuming <span className="text-curator-accent">{resumingId}</span>…
-        </p>
-      </div>
-    );
-  }
+  // Show per-session resume spinner removed — handled by drawer now
 
   const isFsaSupported = 'showDirectoryPicker' in window;
-  const hasHistory = sessions.length > 0;
-
-  // Check if there's a current session loaded (images in memory) for export
   const hasActiveImages = images.length > 0;
 
   return (
-    <div className="flex flex-col flex-1 overflow-y-auto">
-      <div className="flex flex-col lg:flex-row flex-1 gap-0 min-h-0">
+    <div
+      className="flex flex-col flex-1 overflow-y-auto"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      <div className="flex flex-col items-center gap-8 px-6 py-12 animate-fade-in">
 
-        {/* ── Left: pick folder + hints ─────────────────────────────────── */}
-        <div className="flex flex-col items-center justify-center gap-8 px-6 py-12 lg:flex-1 animate-fade-in">
-          {/* Hero */}
-          <div className="text-center space-y-3 max-w-lg">
-            <div className="w-20 h-20 mx-auto rounded-2xl bg-curator-panel border border-curator-border flex items-center justify-center p-3">
-              <img src={logo} alt="SnapSortr" className="w-full h-full object-contain" draggable={false} />
-            </div>
-            <h1 className="text-4xl font-bold text-curator-text font-display tracking-tight">SnapSortr</h1>
-            <p className="text-curator-muted text-base leading-relaxed">
-              Rapidly curate thousands of images with simple keyboard shortcuts.
-              Sort, keep or drop — all without moving a single file.
-            </p>
+        {/* Hero */}
+        <div className="text-center space-y-3 max-w-lg">
+          <div className="w-20 h-20 mx-auto rounded-2xl bg-curator-panel border border-curator-border flex items-center justify-center p-3">
+            <img src={logo} alt="SnapSortr" className="w-full h-full object-contain" draggable={false} />
           </div>
+          <h1 className="text-4xl font-bold text-curator-text font-display tracking-tight">SnapSortr</h1>
+          <p className="text-curator-muted text-base leading-relaxed">
+            Rapidly curate thousands of images with simple keyboard shortcuts.
+            Sort, keep or drop — all without moving a single file.
+          </p>
+        </div>
 
-          {/* Action card */}
-          <div className="w-full max-w-sm space-y-4 animate-slide-up">
+        {/* Action card */}
+        <div className="w-full max-w-sm space-y-4 animate-slide-up">
             {/* Resume banner — only shown when a browser permission prompt is required */}
             {resumeHandle && !permissionGranted && (
               <div className="rounded-xl border border-curator-accent/30 bg-curator-accent/5 px-4 py-3 space-y-2">
@@ -282,20 +239,30 @@ export function FolderSelection() {
                 onClick={handlePickFolder}
                 className={cn(
                   'w-full flex flex-col items-center gap-3 rounded-xl border-2 border-dashed',
-                  'border-curator-border hover:border-curator-accent/60',
-                  'bg-curator-surface hover:bg-curator-panel',
                   'py-8 px-6 text-center transition-all group',
+                  isDragging
+                    ? 'border-curator-accent bg-curator-accent/10 scale-[1.01]'
+                    : 'border-curator-border hover:border-curator-accent/60 bg-curator-surface hover:bg-curator-panel',
                 )}
               >
-                <div className="w-12 h-12 rounded-xl bg-curator-panel group-hover:bg-curator-accent/10 flex items-center justify-center transition-colors">
-                  <FolderOpen size={24} strokeWidth={1.5} className="text-curator-muted group-hover:text-curator-accent transition-colors" />
+                <div className={cn(
+                  'w-12 h-12 rounded-xl flex items-center justify-center transition-colors',
+                  isDragging ? 'bg-curator-accent/20' : 'bg-curator-panel group-hover:bg-curator-accent/10',
+                )}>
+                  <FolderOpen size={24} strokeWidth={1.5} className={cn(
+                    'transition-colors',
+                    isDragging ? 'text-curator-accent' : 'text-curator-muted group-hover:text-curator-accent',
+                  )} />
                 </div>
                 <div>
-                  <p className="text-curator-text group-hover:text-white font-semibold text-sm transition-colors">
-                    Select Image Folder
+                  <p className={cn(
+                    'font-semibold text-sm transition-colors',
+                    isDragging ? 'text-curator-accent' : 'text-curator-text group-hover:text-white',
+                  )}>
+                    {isDragging ? 'Drop folder here' : 'Select Image Folder'}
                   </p>
                   <p className="text-xs text-curator-muted mt-0.5">
-                    Subdirectories are scanned automatically
+                    {isDragging ? 'Release to start scanning' : 'Click to browse · or drag & drop a folder'}
                   </p>
                 </div>
               </button>
@@ -350,200 +317,43 @@ export function FolderSelection() {
             )}
           </div>
 
-          {/* Feature hints */}
-          <div className="grid grid-cols-3 gap-4 max-w-lg w-full text-center animate-fade-in">
+          {/* Feature descriptions — horizontal row */}
+          <div className="flex flex-row gap-3 w-full max-w-2xl animate-fade-in">
             {[
-              { icon: <Keyboard size={20} className="text-curator-accent" />, title: 'Keyboard First', desc: 'J/F to sort instantly' },
-              { icon: <Database size={20} className="text-curator-accent" />, title: 'Auto-saved', desc: 'Progress in IndexedDB' },
-              { icon: <Package size={20} className="text-curator-accent" />, title: 'ZIP Export', desc: 'Preserves folder structure' },
+              {
+                icon: <ShieldCheck size={20} className="text-curator-accent" />,
+                title: 'Private by Design',
+                desc: 'Images never leave your device. Nothing is uploaded or synced to any server.',
+              },
+              {
+                icon: <Keyboard size={20} className="text-curator-accent" />,
+                title: 'Keyboard-First',
+                desc: 'J to keep, F to drop, arrows to navigate. No mouse needed.',
+              },
+              {
+                icon: <Database size={20} className="text-curator-accent" />,
+                title: 'Auto-Saved',
+                desc: 'Every decision saves instantly. Resume any session after a restart.',
+              },
+              {
+                icon: <Package size={20} className="text-curator-accent" />,
+                title: 'Flexible Export',
+                desc: 'ZIP download or copy to folder. Preserve your original structure.',
+              },
             ].map((f) => (
               <div
                 key={f.title}
-                className="rounded-xl bg-curator-surface border border-curator-border p-3 space-y-1"
+                className="flex-1 rounded-xl bg-curator-surface border border-curator-border px-3 py-4 space-y-2 select-none"
               >
-                <div>{f.icon}</div>
-                <p className="text-xs font-semibold text-curator-text">{f.title}</p>
-                <p className="text-xs text-curator-muted">{f.desc}</p>
+                <div className="flex justify-center">{f.icon}</div>
+                <p className="text-xs font-semibold text-curator-text text-center">{f.title}</p>
+                <p className="text-xs text-curator-muted text-center leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
-        </div>
-
-        {/* ── Right: session history ────────────────────────────────────── */}
-        {hasHistory && (
-          <aside
-            className={cn(
-              'border-t lg:border-t-0 lg:border-l border-curator-border bg-curator-surface flex flex-col transition-all',
-              historyOpen ? 'lg:w-96' : 'lg:w-12',
-            )}
-          >
-            <div className="px-4 py-3 border-b border-curator-border flex items-center gap-2 shrink-0">
-              {historyOpen && (
-                <>
-                  <History size={16} className="text-curator-accent" />
-                  <span className="text-sm font-semibold text-curator-text">Session History</span>
-                  <span className="ml-auto text-xs text-curator-muted">{sessions.length} session{sessions.length !== 1 ? 's' : ''}</span>
-                </>
-              )}
-              <button
-                onClick={() => setHistoryOpen((v) => !v)}
-                title={historyOpen ? 'Collapse history' : 'Expand history'}
-                className={cn(
-                  'w-6 h-6 flex items-center justify-center rounded text-curator-muted hover:text-curator-text hover:bg-curator-border transition-colors shrink-0',
-                  !historyOpen && 'mx-auto',
-                )}
-              >
-                {historyOpen ? <X size={14} /> : <History size={14} />}
-              </button>
-            </div>
-
-            {historyOpen && (
-              <div className="flex-1 overflow-y-auto divide-y divide-curator-border">
-                {sessions.map((session) => {
-                  const isActive = useAppStore.getState().currentSessionId === session.id && hasActiveImages;
-                  return (
-                    <SessionCard
-                      key={session.id}
-                      session={session}
-                      onResume={() => handleResumeSession(session)}
-                      onDelete={(e) => handleDeleteSession(e, session.id)}
-                      onExport={(e) => handleExportSessionCard(e, session)}
-                      isCurrentSession={isActive}
-                      currentSelections={isActive ? selections : null}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </aside>
-        )}
       </div>
     </div>
   );
 }
 
-// ─── Session card ─────────────────────────────────────────────────────────────
 
-function SessionCard({
-  session,
-  onResume,
-  onDelete,
-  onExport,
-  isCurrentSession,
-  currentSelections,
-}: {
-  session: SessionRecord;
-  onResume: () => void;
-  onDelete: (e: React.MouseEvent) => void;
-  onExport: (e: React.MouseEvent) => void;
-  isCurrentSession: boolean;
-  currentSelections: Map<string, import('../../types').SelectionState> | null;
-}) {
-  // Use live stats if this is the active session, else stored snapshot
-  const taken = isCurrentSession && currentSelections
-    ? [...currentSelections.values()].filter((v) => v === 'taken').length
-    : session.taken;
-  const dropped = isCurrentSession && currentSelections
-    ? [...currentSelections.values()].filter((v) => v === 'dropped').length
-    : session.dropped;
-  const total = session.totalImages;
-  const reviewed = taken + dropped;
-  const progressPct = total > 0 ? Math.round((reviewed / total) * 100) : 0;
-
-  const lastAccessed = new Date(session.lastAccessedAt);
-  const timeAgo = formatTimeAgo(session.lastAccessedAt);
-
-  return (
-    <div
-      className={cn(
-        'group flex flex-col gap-2 px-4 py-3 cursor-pointer hover:bg-curator-panel transition-colors',
-        isCurrentSession && 'bg-curator-accent/5 border-l-2 border-l-curator-accent',
-      )}
-      onClick={onResume}
-    >
-      {/* Row 1: folder name + actions */}
-      <div className="flex items-center gap-2 min-w-0">
-        <FolderOpen size={14} className="text-curator-accent shrink-0" />
-        <span className="text-sm font-medium text-curator-text truncate flex-1">
-          {session.folderName}
-        </span>
-        {isCurrentSession && (
-          <span className="text-[10px] font-semibold bg-curator-accent/20 text-curator-accent px-1.5 py-0.5 rounded shrink-0">
-            Active
-          </span>
-        )}
-        {/* Action buttons — visible on hover */}
-        <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            title="Export progress as JSON"
-            onClick={onExport}
-            className="w-6 h-6 flex items-center justify-center rounded text-curator-muted hover:text-white hover:bg-curator-border transition-colors"
-          >
-            <Download size={12} />
-          </button>
-          <button
-            title="Resume session"
-            onClick={(e) => { e.stopPropagation(); onResume(); }}
-            className="w-6 h-6 flex items-center justify-center rounded text-curator-muted hover:text-curator-accent hover:bg-curator-border transition-colors"
-          >
-            <PlayCircle size={12} />
-          </button>
-          <button
-            title="Delete from history"
-            onClick={onDelete}
-            className="w-6 h-6 flex items-center justify-center rounded text-curator-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-          >
-            <Trash2 size={12} />
-          </button>
-        </div>
-      </div>
-
-      {/* Row 2: stats badges */}
-      <div className="flex items-center gap-2 text-xs">
-        <span className="flex items-center gap-1 text-green-400">
-          <Check size={10} strokeWidth={3} />
-          {taken} taken
-        </span>
-        <span className="flex items-center gap-1 text-red-400">
-          <X size={10} strokeWidth={3} />
-          {dropped} dropped
-        </span>
-        <span className="text-curator-muted">
-          {total - reviewed} left
-        </span>
-        <span className="ml-auto text-curator-muted tabular-nums" title={lastAccessed.toLocaleString()}>
-          {timeAgo}
-        </span>
-      </div>
-
-      {/* Row 3: progress bar */}
-      <div className="h-1 w-full bg-curator-border rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all"
-          style={{
-            width: `${progressPct}%`,
-            background: progressPct === 100 ? '#22c55e' : '#6366f1',
-          }}
-        />
-      </div>
-      <div className="flex justify-between text-[10px] text-curator-muted">
-        <span>{total.toLocaleString()} images total</span>
-        <span className="tabular-nums">{progressPct}% reviewed</span>
-      </div>
-    </div>
-  );
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatTimeAgo(ms: number): string {
-  const diff = Date.now() - ms;
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(ms).toLocaleDateString();
-}

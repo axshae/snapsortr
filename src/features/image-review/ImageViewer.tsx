@@ -144,14 +144,7 @@ export function ImageViewer({
             />
           );
         },
-        // Filename centred below the image using YARL's dedicated footer slot
-        slideFooter: ({ slide }) => (
-          <div className="text-center pb-3 pt-1 pointer-events-none">
-            <span className="text-white/40 text-xs">
-              {(slide as SlideImage).imageFilename}
-            </span>
-          </div>
-        ),
+
       }}
       toolbar={{
         // Zoom plugin prepends its own zoom-in / zoom-out buttons automatically.
@@ -217,7 +210,7 @@ function LazySlide({
   imageId: string;
   onDimensionsReady: (id: string, w: number, h: number) => void;
 }) {
-  const url = useObjectUrl(handle);
+  const { url } = useObjectUrl(handle, imageId);
 
   if (!url) {
     return (

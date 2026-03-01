@@ -74,10 +74,9 @@ export function ImageReview() {
     importProgressJson: s.importProgressJson,
   })));
 
-  // Suppress lint warnings — these are subscribed purely to trigger re-renders
+  // `images` triggers re-renders; currentDirectory/activeFilter/sortMode are
+  // used below as a gallery key so we can remove the void suppressions.
   void images;
-  void currentDirectory;
-  void activeFilter;
 
   // Import JSON
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -243,6 +242,7 @@ export function ImageReview() {
             <SingleView image={currentImage ?? null} />
           ) : (
             <VirtualizedGallery
+              key={`${currentDirectory}|${activeFilter}|${sortMode}`}
               images={filteredImages}
               selections={selections}
               focusedIndex={focusedIndex}
@@ -273,7 +273,7 @@ export function ImageReview() {
 // ─── Single image view ────────────────────────────────────────────────────────
 
 function SingleView({ image }: { image: ImageFile | null }) {
-  const url = useObjectUrl(image?.handle ?? null);
+  const { url, isLoading } = useObjectUrl(image?.handle ?? null, image?.id);
   const { openViewer, focusedIndex, selections } = useAppStore(useShallow((s) => ({
     openViewer: s.openViewer,
     focusedIndex: s.focusedIndex,
@@ -309,6 +309,16 @@ function SingleView({ image }: { image: ImageFile | null }) {
         <div className="flex flex-col items-center gap-2 text-curator-muted">
           <div className="w-8 h-8 border-2 border-curator-muted/30 border-t-curator-muted rounded-full animate-spin" />
           <span className="text-sm">Loading…</span>
+        </div>
+      )}
+
+      {/* Loading overlay — shown while a slow-decode format (HEIC, TIFF) is
+          being processed. Fades in over the previous image so the transition
+          is obvious rather than a sudden swap. */}
+      {isLoading && url && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-curator-bg/70 backdrop-blur-sm z-20 animate-fade-in pointer-events-none">
+          <div className="w-8 h-8 border-2 border-curator-muted/30 border-t-curator-accent rounded-full animate-spin" />
+          <span className="text-xs text-curator-muted">Decoding image…</span>
         </div>
       )}
 
