@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base defaults ───────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #030712;
+    color: #f9fafb;
+  }
+
+  body {
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ─── Component utilities ─────────────────────────────────────────────────── */
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
+           bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700
+           text-white font-semibold text-sm
+           transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
+           bg-transparent hover:bg-gray-800 border border-gray-700 hover:border-gray-600
+           text-gray-300 hover:text-white font-medium text-sm
+           transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900;
+  }
+
+  .btn-icon {
+    @apply inline-flex items-center justify-center w-8 h-8 rounded-lg
+           text-gray-400 hover:text-white hover:bg-gray-800
+           transition-colors focus:outline-none
+           disabled:opacity-30 disabled:cursor-not-allowed;
+  }
+
+  .kbd {
+    @apply inline-flex items-center justify-center
+           px-1.5 py-0.5 rounded border border-gray-700 bg-gray-800
+           text-gray-400 font-mono text-xs leading-none;
+  }
+}
+
+/* ─── Typography utilities ───────────────────────────────────────────────── */
+@layer utilities {
+  .font-display {
+    font-family: 'Space Grotesk', sans-serif;
+  }
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────────────────────── */
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #374151 transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #374151;
+    border-radius: 2px;
+  }
+}
+
+/* ─── react-photo-view overrides ─────────────────────────────────────────── */
+.PhotoView-Portal .PhotoView__PhotoWrap {
+  background-color: rgba(0, 0, 0, 0.95) !important;
+}
