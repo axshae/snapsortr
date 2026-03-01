@@ -194,14 +194,14 @@ export function FolderSelection() {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      <div className="flex flex-col items-center gap-8 px-6 py-12 animate-fade-in">
+      <div className="flex flex-col items-center gap-6 sm:gap-8 px-4 sm:px-6 py-8 sm:py-12 animate-fade-in">
 
         {/* Hero */}
         <div className="text-center space-y-3 max-w-lg">
           <div className="w-20 h-20 mx-auto rounded-2xl bg-curator-panel border border-curator-border flex items-center justify-center p-3">
             <img src={logo} alt="SnapSortr" className="w-full h-full object-contain" draggable={false} />
           </div>
-          <h1 className="text-4xl font-bold text-curator-text font-display tracking-tight">SnapSortr</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-curator-text font-display tracking-tight">SnapSortr</h1>
           <p className="text-curator-muted text-base leading-relaxed">
             Rapidly curate thousands of images with simple keyboard shortcuts.
             Sort, keep or drop — all without moving a single file.
@@ -317,8 +317,8 @@ export function FolderSelection() {
             )}
           </div>
 
-          {/* Feature descriptions — horizontal row */}
-          <div className="flex flex-row gap-3 w-full max-w-2xl animate-fade-in">
+          {/* Feature descriptions — 2×2 on mobile, 4-column on sm+ */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-2xl animate-fade-in">
             {[
               {
                 icon: <ShieldCheck size={20} className="text-curator-accent" />,
@@ -343,7 +343,7 @@ export function FolderSelection() {
             ].map((f) => (
               <div
                 key={f.title}
-                className="flex-1 rounded-xl bg-curator-surface border border-curator-border px-3 py-4 space-y-2 select-none"
+                className="rounded-xl bg-curator-surface border border-curator-border px-3 py-4 space-y-2 select-none"
               >
                 <div className="flex justify-center">{f.icon}</div>
                 <p className="text-xs font-semibold text-curator-text text-center">{f.title}</p>

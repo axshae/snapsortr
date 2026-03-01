@@ -52,7 +52,7 @@ export function ActionBar() {
   const total = filtered.length;
 
   return (
-    <div className="flex items-center justify-between gap-4 px-4 py-3 bg-curator-surface border-t border-curator-border">
+    <div className="flex items-center justify-between gap-2 sm:gap-4 px-2 sm:px-4 py-2 sm:py-3 bg-curator-surface border-t border-curator-border">
       {/* Left: navigation */}
       <div className="flex items-center gap-2">
         <button
@@ -79,7 +79,7 @@ export function ActionBar() {
       </div>
 
       {/* Center: action buttons */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1 sm:gap-3">
         {/* Drop */}
         <ActionButton
           label="Drop"
@@ -166,7 +166,7 @@ function ActionButton({
     <button
       onClick={onClick}
       className={cn(
-        'flex items-center gap-2 px-5 py-2 rounded-lg border-2 font-semibold text-sm transition-all',
+        'flex items-center gap-1 sm:gap-2 px-2.5 py-1.5 sm:px-5 sm:py-2 rounded-lg border-2 font-semibold text-sm transition-all',
         'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-curator-surface',
         active ? activeClass : colorClass,
       )}
@@ -174,7 +174,7 @@ function ActionButton({
       {label}
       <kbd
         className={cn(
-          'text-xs px-1.5 py-0.5 rounded border font-mono',
+          'hidden sm:inline-flex text-xs px-1.5 py-0.5 rounded border font-mono',
           active
             ? 'bg-white/10 border-white/20 text-white/70'
             : 'bg-curator-bg border-curator-border text-curator-muted',

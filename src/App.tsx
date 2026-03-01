@@ -40,7 +40,7 @@ export default function App() {
           <WizardProgress currentStep={STEP_NUMBER[step] ?? 1} />
 
           {/* History button */}
-          <div className="w-28 hidden sm:flex justify-end gap-2">
+          <div className="flex justify-end gap-2">
             <a
               href="https://github.com/axshae/snapsortr"
               target="_blank"

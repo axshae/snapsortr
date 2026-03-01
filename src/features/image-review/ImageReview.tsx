@@ -19,6 +19,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { useObjectUrl } from '../../hooks/useObjectUrl';
+import { useSwipeNavigation } from '../../hooks/useSwipeNavigation';
 import { DirectorySidebar } from '../../components/DirectorySidebar';
 import { Breadcrumb } from '../../components/Breadcrumb';
 import { FilterTabs } from '../../components/FilterTabs';
@@ -43,6 +44,7 @@ export function ImageReview() {
     openViewer,
     closeViewer,
     getFilteredImages,
+    navigateImage,
     // subscribe to these so component re-renders when they change
     images,
     selections,
@@ -64,6 +66,7 @@ export function ImageReview() {
     openViewer: s.openViewer,
     closeViewer: s.closeViewer,
     getFilteredImages: s.getFilteredImages,
+    navigateImage: s.navigateImage,
     images: s.images,
     selections: s.selections,
     currentDirectory: s.currentDirectory,
@@ -105,6 +108,13 @@ export function ImageReview() {
     singleViewRef.current?.focus();
   }, []);
 
+  // Swipe navigation (mobile)
+  useSwipeNavigation({
+    onSwipeLeft: () => navigateImage('next'),
+    onSwipeRight: () => navigateImage('prev'),
+    enabled: true,
+  });
+
   const handleGridSelect = useCallback(
     (index: number) => setFocusedIndex(index),
     [setFocusedIndex],
@@ -121,105 +131,117 @@ export function ImageReview() {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-curator-bg text-curator-text">
       {/* ── Top header ─────────────────────────────────────────────────────── */}
-      <header className="flex items-center gap-3 px-4 py-2 border-b border-curator-border bg-curator-surface shrink-0">
-        {/* Home button */}
-        <button
-          onClick={() => setStep('folder-selection')}
-          title="Go to home"
-          className="btn-icon shrink-0 text-curator-muted hover:text-curator-text"
-        >
-          <Home size={16} />
-        </button>
+      <header className="shrink-0 bg-curator-surface border-b border-curator-border">
+        {/* ── Row 1: always visible ─────────────────────────────────────── */}
+        <div className="flex items-center gap-2 px-3 py-2">
+          {/* Home button */}
+          <button
+            onClick={() => setStep('folder-selection')}
+            title="Go to home"
+            className="btn-icon shrink-0 text-curator-muted hover:text-curator-text"
+          >
+            <Home size={16} />
+          </button>
 
-        {/* Breadcrumb */}
-        <div className="flex-1 min-w-0">
-          <Breadcrumb />
-        </div>
-
-        {/* Progress bar */}
-        <div className="hidden md:flex items-center gap-2 text-xs text-curator-muted shrink-0">
-          <div className="w-24 h-1.5 bg-curator-panel rounded-full overflow-hidden">
-            <div
-              className="h-full bg-curator-accent transition-all"
-              style={{ width: `${progressPct}%` }}
-            />
+          {/* Breadcrumb */}
+          <div className="flex-1 min-w-0">
+            <Breadcrumb />
           </div>
-          <span className="tabular-nums">{progressPct}%</span>
+
+          {/* Progress bar (md+) */}
+          <div className="hidden md:flex items-center gap-2 text-xs text-curator-muted shrink-0">
+            <div className="w-24 h-1.5 bg-curator-panel rounded-full overflow-hidden">
+              <div
+                className="h-full bg-curator-accent transition-all"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            <span className="tabular-nums">{progressPct}%</span>
+          </div>
+
+          {/* View mode toggle */}
+          <div className="flex bg-curator-panel rounded-lg p-0.5 border border-curator-border shrink-0">
+            <button
+              onClick={() => setViewMode('single')}
+              title="Single view (G)"
+              className={cn(
+                'p-1.5 rounded transition-colors',
+                viewMode === 'single'
+                  ? 'bg-curator-accent text-white'
+                  : 'text-curator-muted hover:text-curator-text',
+              )}
+            >
+              <Square size={16} />
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              title="Grid view (G)"
+              className={cn(
+                'p-1.5 rounded transition-colors',
+                viewMode === 'grid'
+                  ? 'bg-curator-accent text-white'
+                  : 'text-curator-muted hover:text-curator-text',
+              )}
+            >
+              <LayoutGrid size={16} />
+            </button>
+          </div>
+
+          {/* Filter tabs + Sort (md+ only — shown in row 2 on mobile) */}
+          <div className="hidden md:flex items-center gap-2">
+            <FilterTabs />
+            <SortSelector sortMode={sortMode} setSortMode={setSortMode} />
+          </div>
+
+          {/* Export + save progress + import + new session */}
+          <div className="flex gap-1 sm:gap-2 shrink-0">
+            <button
+              onClick={() => setStep('export')}
+              className="btn-primary text-sm px-2.5 py-1.5 sm:px-3"
+            >
+              <span className="hidden sm:inline">Export</span>
+              <span className="sm:hidden">↗</span>
+            </button>
+            <button
+              onClick={exportSessionProgress}
+              title="Save progress as JSON"
+              className="btn-secondary text-sm px-2 py-1.5"
+            >
+              <Download size={16} />
+            </button>
+            <button
+              onClick={() => importInputRef.current?.click()}
+              title="Import progress from JSON"
+              className="btn-secondary text-sm px-2 py-1.5"
+            >
+              <Upload size={16} />
+            </button>
+            <button
+              onClick={resetSession}
+              title="Start over"
+              className="btn-secondary text-sm px-2 py-1.5"
+            >
+              <RotateCcw size={16} />
+            </button>
+          </div>
+
+          {/* Hidden file input for JSON import */}
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={handleImportFile}
+          />
         </div>
 
-        {/* View mode toggle */}
-        <div className="flex bg-curator-panel rounded-lg p-0.5 border border-curator-border shrink-0">
-          <button
-            onClick={() => setViewMode('single')}
-            title="Single view (G)"
-            className={cn(
-              'p-1.5 rounded transition-colors',
-              viewMode === 'single'
-                ? 'bg-curator-accent text-white'
-                : 'text-curator-muted hover:text-curator-text',
-            )}
-          >
-            <Square size={16} />
-          </button>
-          <button
-            onClick={() => setViewMode('grid')}
-            title="Grid view (G)"
-            className={cn(
-              'p-1.5 rounded transition-colors',
-              viewMode === 'grid'
-                ? 'bg-curator-accent text-white'
-                : 'text-curator-muted hover:text-curator-text',
-            )}
-          >
-            <LayoutGrid size={16} />
-          </button>
+        {/* ── Row 2: Filter tabs + Sort (mobile only) ───────────────────── */}
+        <div className="flex md:hidden items-center gap-2 px-2 pb-2 overflow-x-auto scrollbar-none border-t border-curator-border/50">
+          <FilterTabs />
+          <div className="shrink-0 ml-auto">
+            <SortSelector sortMode={sortMode} setSortMode={setSortMode} />
+          </div>
         </div>
-
-        {/* Filter tabs */}
-        <FilterTabs />
-
-        {/* Sort selector */}
-        <SortSelector sortMode={sortMode} setSortMode={setSortMode} />
-
-        {/* Export + save progress + import + new session */}
-        <div className="flex gap-2 shrink-0">
-          <button
-            onClick={() => setStep('export')}
-            className="btn-primary text-sm px-3 py-1.5"
-          >
-            Export
-          </button>
-          <button
-            onClick={exportSessionProgress}
-            title="Save progress as JSON"
-            className="btn-secondary text-sm px-2 py-1.5"
-          >
-            <Download size={16} />
-          </button>
-          <button
-            onClick={() => importInputRef.current?.click()}
-            title="Import progress from JSON"
-            className="btn-secondary text-sm px-2 py-1.5"
-          >
-            <Upload size={16} />
-          </button>
-          <button
-            onClick={resetSession}
-            title="Start over"
-            className="btn-secondary text-sm px-2 py-1.5"
-          >
-            <RotateCcw size={16} />
-          </button>
-        </div>
-
-        {/* Hidden file input for JSON import */}
-        <input
-          ref={importInputRef}
-          type="file"
-          accept=".json,application/json"
-          className="hidden"
-          onChange={handleImportFile}
-        />
       </header>
 
       {/* Import feedback banner */}

@@ -35,7 +35,7 @@ export function FilterTabs() {
   void selections;
 
   return (
-    <div className="flex items-center gap-1 bg-curator-surface rounded-lg p-1 border border-curator-border">
+    <div className="flex items-center gap-1 bg-curator-surface rounded-lg p-1 border border-curator-border overflow-x-auto scrollbar-none shrink-0">
       {TABS.map((tab) => (
         <button
           key={tab.value}
