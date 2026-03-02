@@ -42,45 +42,90 @@ export async function queryHandlePermission(
 // ─── Recursive directory scanner ─────────────────────────────────────────────
 
 /**
- * Lazily yields ImageFile metadata for every image found under `dirHandle`.
- * Does NOT read file contents, create object URLs, or load pixels.
- * Only reads file.size and file.lastModified from the File metadata.
+ * Bounded concurrency helper: runs all `tasks` in parallel but keeps at most
+ * `limit` promises in flight at a time. Returns results in completion order
+ * (order is non-deterministic — callers must sort afterwards if needed).
  */
-export async function* scanDirectory(
+async function withConcurrencyLimit<T>(
+  tasks: (() => Promise<T>)[],
+  limit: number,
+): Promise<T[]> {
+  const results: T[] = [];
+  const queue = [...tasks];
+  const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    while (queue.length > 0) {
+      const task = queue.shift()!;
+      results.push(await task());
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+/**
+ * Scans `dirHandle` recursively and returns a flat list of every image found.
+ * Does NOT read file contents, create object URLs, or load pixels — only reads
+ * file.size and file.lastModified from cheap OS metadata.
+ *
+ * Parallelism strategy:
+ *  - Within a single directory: getFile() calls are fanned out in parallel
+ *    (up to FILE_CONCURRENCY at a time).
+ *  - Subdirectory traversal: all sibling subdirectories are scanned in
+ *    parallel via Promise.all, which collapses serial depth into wall-clock
+ *    time proportional to the deepest branch only.
+ */
+const FILE_CONCURRENCY = 16;
+
+export async function scanDirectory(
   dirHandle: FileSystemDirectoryHandle,
   relativePath = '',
-): AsyncGenerator<ImageFile> {
+): Promise<ImageFile[]> {
+  const fileEntries: { name: string; handle: FileSystemFileHandle }[] = [];
+  const subDirEntries: { name: string; handle: FileSystemDirectoryHandle }[] = [];
+
+  // Collect all entries in this directory (streaming API — must stay serial)
   for await (const [name, handle] of dirHandle.entries()) {
     const entryPath = relativePath ? `${relativePath}/${name}` : name;
-
     if (handle.kind === 'directory') {
-      yield* scanDirectory(handle as FileSystemDirectoryHandle, entryPath);
+      subDirEntries.push({ name: entryPath, handle: handle as FileSystemDirectoryHandle });
     } else if (handle.kind === 'file' && isImageFile(name)) {
-      // Read only size + lastModified (cheap metadata call)
-      let size = 0;
-      let lastModified = 0;
-      try {
-        const file = await (handle as FileSystemFileHandle).getFile();
-        size = file.size;
-        lastModified = file.lastModified;
-      } catch {
-        // Skip unreadable files
-        continue;
-      }
+      fileEntries.push({ name, handle: handle as FileSystemFileHandle });
+    }
+  }
 
-      const imageFile: ImageFile = {
+  // Fan out getFile() metadata reads across all image files in this directory
+  const fileTasks = fileEntries.map(({ name, handle }) => async (): Promise<ImageFile | null> => {
+    const entryPath = relativePath ? `${relativePath}/${name}` : name;
+    try {
+      const file = await handle.getFile();
+      return {
         id: pathToId(entryPath),
         path: entryPath,
         filename: name,
         directory: getDirectory(entryPath),
-        handle: handle as FileSystemFileHandle,
-        size,
-        lastModified,
+        handle,
+        size: file.size,
+        lastModified: file.lastModified,
       };
+    } catch {
+      return null; // Skip unreadable files
+    }
+  });
 
-      yield imageFile;
+  const fileResults = await withConcurrencyLimit(fileTasks, FILE_CONCURRENCY);
+  const images: ImageFile[] = fileResults.filter((img): img is ImageFile => img !== null);
+
+  // Recurse into all subdirectories in parallel
+  if (subDirEntries.length > 0) {
+    const subResults = await Promise.all(
+      subDirEntries.map(({ name, handle }) => scanDirectory(handle, name)),
+    );
+    for (const subImages of subResults) {
+      images.push(...subImages);
     }
   }
+
+  return images;
 }
 
 // ─── Object URL helpers ───────────────────────────────────────────────────────

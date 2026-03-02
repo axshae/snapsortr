@@ -149,31 +149,20 @@ export const useAppStore = create<AppState>()(
         currentSessionId: handle.name,
       });
 
-      // Persist root handle so we can prompt for re-permission on reload
-      await db.saveRootHandle(handle);
-      // Also save per-session handle for history-based resume
-      await db.saveSessionHandle(handle.name, handle);
-
-      // Load previously saved selections.
-      // Uses getAllSelectionsForSession so selections from sibling sessions
-      // (e.g. a parent or child directory scanned separately) never bleed in.
-      const saved = await db.getAllSelectionsForSession(handle.name);
+      // Run IDB writes + selections load in parallel — all three are independent
+      const [, , saved] = await Promise.all([
+        db.saveRootHandle(handle),
+        db.saveSessionHandle(handle.name, handle),
+        // Uses getAllSelectionsForSession so selections from sibling sessions
+        // (e.g. a parent or child directory scanned separately) never bleed in.
+        db.getAllSelectionsForSession(handle.name),
+      ]);
       const selectionMap = new Map<string, SelectionState>(
         saved.map((s) => [pathToId(s.path), s.selection]),
       );
 
-      const allImages: ImageFile[] = [];
-      let batchCount = 0;
-
-      for await (const image of scanDirectory(handle)) {
-        allImages.push(image);
-        batchCount++;
-
-        // Stream updates to the UI every 100 images
-        if (batchCount % 100 === 0) {
-          set({ images: [...allImages], scanCount: allImages.length });
-        }
-      }
+      // Scan all images in parallel (concurrent getFile() + parallel subdirs)
+      const allImages = await scanDirectory(handle);
 
       // Build directory tree from the full flat list
       const tree = buildTreeFromImages(allImages, handle.name);
@@ -186,30 +175,31 @@ export const useAppStore = create<AppState>()(
         scanCount: allImages.length,
       });
 
-      // Create or update the session record
+      // Persist session record — fire-and-forget so step transition is not blocked
       const stats = computeStats(allImages, selectionMap);
       const sessionId = handle.name;
-      const existing = await db.getSession(sessionId);
-      if (existing) {
-        await db.updateSession(sessionId, {
-          lastAccessedAt: Date.now(),
-          totalImages: allImages.length,
-          taken: stats.taken,
-          dropped: stats.dropped,
-          undecided: stats.undecided,
-        });
-      } else {
-        await db.saveSession({
-          id: sessionId,
-          folderName: handle.name,
-          startedAt: Date.now(),
-          lastAccessedAt: Date.now(),
-          totalImages: allImages.length,
-          taken: stats.taken,
-          dropped: stats.dropped,
-          undecided: stats.undecided,
-        });
-      }
+      void db.getSession(sessionId).then((existing) => {
+        if (existing) {
+          return db.updateSession(sessionId, {
+            lastAccessedAt: Date.now(),
+            totalImages: allImages.length,
+            taken: stats.taken,
+            dropped: stats.dropped,
+            undecided: stats.undecided,
+          });
+        } else {
+          return db.saveSession({
+            id: sessionId,
+            folderName: handle.name,
+            startedAt: Date.now(),
+            lastAccessedAt: Date.now(),
+            totalImages: allImages.length,
+            taken: stats.taken,
+            dropped: stats.dropped,
+            undecided: stats.undecided,
+          });
+        }
+      });
     },
 
     setSelection: (id, path, selection) => {

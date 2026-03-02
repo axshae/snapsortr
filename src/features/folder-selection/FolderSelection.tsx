@@ -19,7 +19,7 @@ import { cn } from '../../utils/cn';
 
 export function FolderSelection() {
   const {
-    loadFolder, setStep, isScanning, scanCount,
+    loadFolder, setStep, isScanning,
     loadSessions, exportSessionProgress,
     importSessionFromJson,
     images,
@@ -27,7 +27,6 @@ export function FolderSelection() {
     loadFolder: s.loadFolder,
     setStep: s.setStep,
     isScanning: s.isScanning,
-    scanCount: s.scanCount,
     loadSessions: s.loadSessions,
     exportSessionProgress: s.exportSessionProgress,
     importSessionFromJson: s.importSessionFromJson,
@@ -171,8 +170,8 @@ export function FolderSelection() {
                 : <>Resuming session — <span className="text-curator-accent">{resumeHandle!.name}</span></>}
             </p>
             {isScanning && (
-              <p className="text-xs text-curator-muted tabular-nums">
-                {scanCount.toLocaleString()} images found…
+              <p className="text-xs text-curator-muted">
+                Reading files…
               </p>
             )}
           </>
