@@ -74,9 +74,11 @@ export function useKeyboardShortcuts(enabled = true) {
         case 'd':
           if (current) setSelection(current.id, current.path, 'dropped');
           break;
-        case 'u':
         case 's':
           if (current) setSelection(current.id, current.path, 'undecided');
+          break;
+        case 'u':
+           decideAndAdvance('undecided');
           break;
 
         // ── Rapid sort (decide + advance) ─────────────────────────────────

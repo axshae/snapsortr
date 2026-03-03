@@ -2,7 +2,7 @@
 
 **Fast, private, browser-based image curation — your photos never leave your device.**
 
-🌐 [snapsortr.pages.dev](https://snapsortr.pages.dev) &nbsp;·&nbsp; Works offline &nbsp;·&nbsp; No account required &nbsp;·&nbsp; Chrome / Edge
+🌐 [snapsortr.com](https://snapsortr.com) &nbsp;·&nbsp; Works offline &nbsp;·&nbsp; No account required &nbsp;·&nbsp; Chrome / Edge
 
 ---
 
