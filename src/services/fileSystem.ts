@@ -79,6 +79,8 @@ const FILE_CONCURRENCY = 16;
 export async function scanDirectory(
   dirHandle: FileSystemDirectoryHandle,
   relativePath = '',
+  onProgress?: (count: number) => void,
+  _counter: { value: number } = { value: 0 },
 ): Promise<ImageFile[]> {
   const fileEntries: { name: string; handle: FileSystemFileHandle }[] = [];
   const subDirEntries: { name: string; handle: FileSystemDirectoryHandle }[] = [];
@@ -97,8 +99,8 @@ export async function scanDirectory(
   const fileTasks = fileEntries.map(({ name, handle }) => async (): Promise<ImageFile | null> => {
     const entryPath = relativePath ? `${relativePath}/${name}` : name;
     try {
-      const file = await handle.getFile();
-      return {
+      const file = await handle.getFile();      _counter.value++;
+      onProgress?.(_counter.value);      return {
         id: pathToId(entryPath),
         path: entryPath,
         filename: name,
@@ -118,7 +120,7 @@ export async function scanDirectory(
   // Recurse into all subdirectories in parallel
   if (subDirEntries.length > 0) {
     const subResults = await Promise.all(
-      subDirEntries.map(({ name, handle }) => scanDirectory(handle, name)),
+      subDirEntries.map(({ name, handle }) => scanDirectory(handle, name, onProgress, _counter)),
     );
     for (const subImages of subResults) {
       images.push(...subImages);

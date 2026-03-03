@@ -117,10 +117,16 @@ export async function getDisplayableBlob(file: File, id?: string): Promise<Blob>
 
   // ── SVG ────────────────────────────────────────────────────────────────────
   if (ext === 'svg') {
+    if (id) {
+      const hit = decodedBlobCache.get(id);
+      if (hit) return hit;
+    }
     // blob: URLs for SVG require an explicit image/svg+xml MIME type in Chrome.
-    if (file.type === 'image/svg+xml') return file;
-    const buf = await file.arrayBuffer();
-    return new Blob([buf], { type: 'image/svg+xml' });
+    const blob: Blob = file.type === 'image/svg+xml'
+      ? file
+      : new Blob([await file.arrayBuffer()], { type: 'image/svg+xml' });
+    if (id) decodedBlobCache.set(id, blob);
+    return blob;
   }
 
   return file;
@@ -129,7 +135,8 @@ export async function getDisplayableBlob(file: File, id?: string): Promise<Blob>
 /** True for formats that need pre-processing before URL / bitmap creation. */
 export function needsDecode(name: string): boolean {
   const ext = getExt(name);
-  return ext === 'heic' || ext === 'heif' || ext === 'tiff' || ext === 'tif' || ext === 'svg';
+  // SVG is handled separately via data: URL — it does not go through getDisplayableBlob.
+  return ext === 'heic' || ext === 'heif' || ext === 'tiff' || ext === 'tif';
 }
 
 // ─── TIFF decoder ─────────────────────────────────────────────────────────────

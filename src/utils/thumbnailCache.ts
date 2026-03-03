@@ -73,7 +73,19 @@ async function generate(
 
   try {
     const file = await handle.getFile();
-    // Pre-process formats that need decoding (HEIC, HEIF, TIFF, SVG).
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+
+    // SVG: read as text and produce a data: URL. This is more reliable than
+    // blob: URL + image/svg+xml, which Chrome may refuse to render for SVGs
+    // lacking explicit width/height attributes or containing certain content.
+    if (ext === 'svg') {
+      const text = await file.text();
+      const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(text);
+      cache.set(id, dataUrl);
+      return dataUrl;
+    }
+
+    // Pre-process formats that need decoding (HEIC, HEIF, TIFF).
     // Pass `id` so the decoded blob is cached — the full-screen viewer can
     // reuse it without running heic2any/utif a second time.
     const displayable = await getDisplayableBlob(file, id);
@@ -87,6 +99,13 @@ async function generate(
 
       // Scale to thumbnail dimensions
       const { width: bw, height: bh } = bitmap;
+
+      // Guard against zero-size bitmaps (can occur for malformed files).
+      if (bw === 0 || bh === 0) {
+        bitmap.close();
+        throw new Error('Zero-size bitmap');
+      }
+
       const scale = Math.min(1, THUMB_MAX_DIM / Math.max(bw, bh));
       const tw = Math.round(bw * scale);
       const th = Math.round(bh * scale);
@@ -161,7 +180,10 @@ export function getCachedThumbnail(id: string): string | null {
  */
 export function clearThumbnailCache(): void {
   for (const url of cache.values()) {
-    URL.revokeObjectURL(url);
+    // data: URLs (used for SVG) cannot and do not need to be revoked.
+    if (url.startsWith('blob:')) {
+      URL.revokeObjectURL(url);
+    }
   }
   cache.clear();
   inflight.clear();

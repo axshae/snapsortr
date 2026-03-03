@@ -16,6 +16,7 @@ const STEP_NUMBER: Record<string, 1 | 2 | 3> = {
 
 export default function App() {
   const step = useAppStore((s) => s.step);
+  const setStep = useAppStore((s) => s.setStep);
   const sessionCount = useAppStore((s) => s.sessions.length);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -25,16 +26,22 @@ export default function App() {
       {step !== 'image-review' && (
         <header className="flex items-center justify-between px-6 py-3 border-b border-curator-border bg-curator-surface shrink-0">
           <div className="flex items-center gap-3">
-            {/* Logo */}
-            <img
-              src={logo}
-              alt="SnapSortr logo"
-              className="w-7 h-7 rounded-lg bg-curator-accent object-contain p-1"
-              draggable={false}
-            />
-            <span className="text-sm font-bold text-curator-text hidden sm:block font-display tracking-tight">
-              SnapSortr
-            </span>
+            {/* Logo — click to go home */}
+            <button
+              onClick={() => setStep('folder-selection')}
+              className="flex items-center gap-3 group"
+              title="Go to home"
+            >
+              <img
+                src={logo}
+                alt="SnapSortr logo"
+                className="w-7 h-7 rounded-lg bg-curator-accent object-contain p-1"
+                draggable={false}
+              />
+              <span className="text-sm font-bold text-curator-text hidden sm:block font-display tracking-tight group-hover:text-curator-accent transition-colors">
+                SnapSortr
+              </span>
+            </button>
           </div>
 
           <WizardProgress currentStep={STEP_NUMBER[step] ?? 1} />

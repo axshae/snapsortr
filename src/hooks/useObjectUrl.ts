@@ -45,18 +45,38 @@ export function useObjectUrl(
       .getFile()
       .then(async (file) => {
         if (cancelled) return;
-        // Decode HEIC/HEIF/TIFF/SVG to a browser-renderable blob before
-        // creating the object URL so the <img> can actually display it.
-        const blob = needsDecode(handle.name)
-          ? await getDisplayableBlob(file, id)
-          : file;
-        if (cancelled) return;
-        const newUrl = URL.createObjectURL(blob);
-        // Revoke the old URL only after the new one is ready
-        if (prevUrlRef.current) {
-          URL.revokeObjectURL(prevUrlRef.current);
+
+        const ext = handle.name.split('.').pop()?.toLowerCase() ?? '';
+        let newUrl: string;
+
+        if (ext === 'svg') {
+          // Use a data: URL for SVG — more reliable than blob: + image/svg+xml
+          // in Chrome, which can refuse to render SVGs without explicit
+          // width/height attributes or with certain content.
+          const text = await file.text();
+          newUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(text);
+          // Revoke any previous blob URL before switching to a data URL.
+          // data: URLs are self-contained and require no revocation.
+          if (prevUrlRef.current) {
+            URL.revokeObjectURL(prevUrlRef.current);
+            prevUrlRef.current = null;
+          }
+        } else {
+          // Decode HEIC/HEIF/TIFF to a browser-renderable blob before
+          // creating the object URL so the <img> can actually display it.
+          const blob = needsDecode(handle.name)
+            ? await getDisplayableBlob(file, id)
+            : file;
+          if (cancelled) return;
+          newUrl = URL.createObjectURL(blob);
+          // Revoke the old URL only after the new one is ready.
+          if (prevUrlRef.current) {
+            URL.revokeObjectURL(prevUrlRef.current);
+          }
+          prevUrlRef.current = newUrl;
         }
-        prevUrlRef.current = newUrl;
+
+        if (cancelled) return;
         setUrl(newUrl);
         setIsLoading(false);
       })

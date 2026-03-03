@@ -162,7 +162,13 @@ export const useAppStore = create<AppState>()(
       );
 
       // Scan all images in parallel (concurrent getFile() + parallel subdirs)
-      const allImages = await scanDirectory(handle);
+      const allImages = await scanDirectory(handle, '', (count) => {
+        if (get().rootHandle === handle) set({ scanCount: count });
+      });
+
+      // If the scan was cancelled (resetSession called mid-flight), rootHandle
+      // will have been cleared — bail out without overwriting the reset state.
+      if (get().rootHandle !== handle) return;
 
       // Build directory tree from the full flat list
       const tree = buildTreeFromImages(allImages, handle.name);

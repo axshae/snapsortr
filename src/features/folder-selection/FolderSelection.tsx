@@ -5,7 +5,7 @@
  *   1. Pick a new folder via File System Access API
  *   2. Resume a session from the persistent history panel
  */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FolderOpen, Keyboard, Database, Package, ShieldCheck,
   Loader2, Download, Upload,
@@ -19,7 +19,7 @@ import { cn } from '../../utils/cn';
 
 export function FolderSelection() {
   const {
-    loadFolder, setStep, isScanning,
+    loadFolder, setStep, isScanning, resetSession, scanCount,
     loadSessions, exportSessionProgress,
     importSessionFromJson,
     images,
@@ -27,6 +27,8 @@ export function FolderSelection() {
     loadFolder: s.loadFolder,
     setStep: s.setStep,
     isScanning: s.isScanning,
+    resetSession: s.resetSession,
+    scanCount: s.scanCount,
     loadSessions: s.loadSessions,
     exportSessionProgress: s.exportSessionProgress,
     importSessionFromJson: s.importSessionFromJson,
@@ -40,6 +42,32 @@ export function FolderSelection() {
   const autoResumed = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
+  const [showCancel, setShowCancel] = useState(false);
+  const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Show a cancel button after 15 seconds of active scanning
+  useEffect(() => {
+    if (isScanning) {
+      setShowCancel(false);
+      cancelTimerRef.current = setTimeout(() => setShowCancel(true), 15_000);
+    } else {
+      setShowCancel(false);
+      if (cancelTimerRef.current !== null) {
+        clearTimeout(cancelTimerRef.current);
+        cancelTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (cancelTimerRef.current !== null) {
+        clearTimeout(cancelTimerRef.current);
+      }
+    };
+  }, [isScanning]);
+
+  const handleCancelScan = useCallback(() => {
+    autoResumed.current = false;
+    resetSession();
+  }, [resetSession]);
 
   function handleDragEnter(e: React.DragEvent) {
     e.preventDefault();
@@ -170,9 +198,17 @@ export function FolderSelection() {
                 : <>Resuming session — <span className="text-curator-accent">{resumeHandle!.name}</span></>}
             </p>
             {isScanning && (
-              <p className="text-xs text-curator-muted">
-                Reading files…
+              <p className="text-xs text-curator-muted tabular-nums">
+                Found {<span className="text-curator-text">{scanCount.toLocaleString()}</span>} file{scanCount !== 1 ? 's' : ''}
               </p>
+            )}
+            {isScanning && showCancel && (
+              <button
+                onClick={handleCancelScan}
+                className="mt-2 px-4 py-1.5 rounded-lg border border-curator-border text-sm text-curator-muted hover:text-curator-text hover:border-curator-accent/60 transition-colors"
+              >
+                Cancel
+              </button>
             )}
           </>
         )}
