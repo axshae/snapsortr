@@ -233,7 +233,7 @@ function DrawerSessionCard({
         )}
         <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
-            title="Export progress as JSON"
+            title="Export progress"
             onClick={onExport}
             className="w-6 h-6 flex items-center justify-center rounded text-curator-muted hover:text-white hover:bg-curator-border transition-colors"
           >

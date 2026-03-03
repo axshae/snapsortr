@@ -211,7 +211,7 @@ export function ImageReview() {
             </button>
             <button
               onClick={() => importInputRef.current?.click()}
-              title="Import progress from JSON"
+              title="Import progress"
               className="btn-secondary text-sm px-2 py-1.5"
             >
               <Upload size={16} />

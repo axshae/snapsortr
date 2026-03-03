@@ -309,7 +309,7 @@ export function FolderSelection() {
               className="w-full flex items-center justify-center gap-2 btn-secondary text-sm py-2"
             >
               <Upload size={15} />
-              Import session from JSON
+              Import session
             </button>
             <input
               ref={importJsonRef}
