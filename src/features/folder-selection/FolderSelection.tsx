@@ -239,7 +239,7 @@ export function FolderSelection() {
           <h1 className="text-3xl sm:text-4xl font-bold text-curator-text font-display tracking-tight">SnapSortr</h1>
           <p className="text-curator-muted text-base leading-relaxed">
             Rapidly curate thousands of images with simple keyboard shortcuts.
-            Sort, keep or drop — all without moving a single file.
+            No uploads, no cloud, no account - just you and your photos.
           </p>
         </div>
 
