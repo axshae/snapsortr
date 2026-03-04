@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1280" height="720">
-  <image href="preview.png" width="1280" height="720"/>
-  <!-- Dark circle -->
-  <circle cx="640" cy="360" r="60" fill="rgba(0,0,0,0.6)"/>
-  <!-- Play triangle -->
-  <polygon points="620,330 620,390 680,360" fill="white"/>
-</svg>

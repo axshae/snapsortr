@@ -1,5 +1,5 @@
 # SnapSortr
-[![Watch the demo](public/preview-play.svg)](https://vimeo.com/1170371491)
+[![Watch the demo](public/preview.jpg)](https://vimeo.com/1170371491)
 
 **Fast, private, browser-based image curation — your photos never leave your device.**
 
