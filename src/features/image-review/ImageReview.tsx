@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import React from 'react';
-import { RotateCcw, Square, LayoutGrid, Image, ArrowDownAZ, Clock, HardDrive, Download, Home, Upload } from 'lucide-react';
+import { RotateCcw, Square, LayoutGrid, Image, ArrowDownAZ, Clock, HardDrive, Download, Home, Upload, Eraser } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
@@ -54,6 +54,7 @@ export function ImageReview() {
     exportSessionProgress,
     resetSession,
     importProgressJson,
+    clearSessionSelections,
   } = useAppStore(useShallow((s) => ({
     setStep: s.setStep,
     viewMode: s.viewMode,
@@ -75,6 +76,7 @@ export function ImageReview() {
     exportSessionProgress: s.exportSessionProgress,
     resetSession: s.resetSession,
     importProgressJson: s.importProgressJson,
+    clearSessionSelections: s.clearSessionSelections,
   })));
 
   // `images` triggers re-renders; currentDirectory/activeFilter/sortMode are
@@ -215,6 +217,17 @@ export function ImageReview() {
               className="btn-secondary text-sm px-2 py-1.5"
             >
               <Upload size={16} />
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm('Clear all selections for this session? This cannot be undone.')) {
+                  clearSessionSelections();
+                }
+              }}
+              title="Reset progress (clear all selections)"
+              className="btn-secondary text-sm px-2 py-1.5 text-yellow-400 hover:text-yellow-300 hover:border-yellow-500/50"
+            >
+              <Eraser size={16} />
             </button>
             <button
               onClick={resetSession}

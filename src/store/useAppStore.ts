@@ -80,6 +80,8 @@ interface AppState {
   navigateImage: (direction: 'next' | 'prev') => void;
   /** Mark current focused image and advance to the next */
   decideAndAdvance: (selection: SelectionState) => void;
+  /** Clear all selections for the current session (keeps the folder open) */
+  clearSessionSelections: () => void;
   resetSession: () => void;
 
   // ── History actions ────────────────────────────────────────────────────────
@@ -263,7 +265,7 @@ export const useAppStore = create<AppState>()(
     },
 
     decideAndAdvance: (selection) => {
-      const { focusedIndex, getFilteredImages } = get();
+      const { focusedIndex, getFilteredImages, activeFilter } = get();
       const filtered = getFilteredImages();
       if (filtered.length === 0) return;
       const image = filtered[focusedIndex];
@@ -271,9 +273,33 @@ export const useAppStore = create<AppState>()(
 
       get().setSelection(image.id, image.path, selection);
 
-      // Advance to next image if possible
-      const next = Math.min(focusedIndex + 1, filtered.length - 1);
-      set({ focusedIndex: next });
+      // When in a filtered tab (not 'all') and the new selection removes the
+      // image from that filter, the item at focusedIndex in the new filtered
+      // list is already the next image — just clamp, don't also increment.
+      const willBeRemovedFromFilter = activeFilter !== 'all' && selection !== activeFilter;
+      if (willBeRemovedFromFilter) {
+        // New filtered list has one fewer item; clamp index to its new max.
+        const newMax = Math.max(0, filtered.length - 2);
+        set({ focusedIndex: Math.min(focusedIndex, newMax) });
+      } else {
+        const next = Math.min(focusedIndex + 1, filtered.length - 1);
+        set({ focusedIndex: next });
+      }
+    },
+
+    clearSessionSelections: () => {
+      const { currentSessionId, images } = get();
+      if (!currentSessionId) return;
+      const empty = new Map<string, SelectionState>();
+      set({ selections: empty, focusedIndex: 0 });
+      const stats = computeStats(images, empty);
+      db.clearSelectionsForSession(currentSessionId);
+      db.updateSession(currentSessionId, {
+        lastAccessedAt: Date.now(),
+        taken: stats.taken,
+        dropped: stats.dropped,
+        undecided: stats.undecided,
+      });
     },
 
     resetSession: () => {

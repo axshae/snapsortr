@@ -102,7 +102,12 @@ export function ActionBar() {
           onClick={() => {
             if (current) {
               setSelection(current.id, current.path, 'undecided');
-              navigateImage('next');
+              // In a filtered tab where marking undecided removes the image
+              // (taken or dropped), the focusedIndex already points to the
+              // next image after the state update — no need to advance.
+              if (activeFilter === 'all' || activeFilter === 'undecided') {
+                navigateImage('next');
+              }
             }
           }}
         />

@@ -95,10 +95,16 @@ export function SessionHistoryDrawer({ isOpen, onClose }: Props) {
   }
 
   async function handleClearAll() {
-    const ids = useAppStore.getState().sessions.map((s) => s.id);
+    const { sessions, currentSessionId, resetSession } = useAppStore.getState();
+    const ids = sessions.map((s) => s.id);
     for (const id of ids) {
       await deleteSessionFromHistory(id);
     }
+    // If a session is active in memory, wipe it and return to the homescreen.
+    if (currentSessionId) {
+      resetSession();
+    }
+    onClose();
   }
 
   return (
