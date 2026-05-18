@@ -1,5 +1,10 @@
+
+
 # SnapSortr
-[![Watch the demo](public/preview.jpg)](https://vimeo.com/1170371491)
+
+
+https://github.com/user-attachments/assets/faa1f2bd-c57a-4728-aab0-79878db99cbc
+
 
 **Fast, private, browser-based image curation — your photos never leave your device.**
 
